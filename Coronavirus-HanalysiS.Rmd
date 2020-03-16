@@ -13,7 +13,7 @@ params:
 
 ```{r libs, eval=TRUE, echo=FALSE}
 library(pacman)
-p_load(dplyr,readr, glue, lubridate, gridExtra, kableExtra, tidyr, ggplot2, cowplot)
+p_load(dplyr,readr, glue, lubridate, gridExtra, kableExtra, tidyr, ggplot2, cowplot, forcats)
 ```
 
 ```{r global_options, include=FALSE}
@@ -174,7 +174,7 @@ pie_confirmed <-  confirmed %>% # "country"   "date"      "Confirmed"
   filter(ranking <= 8) %>%
   mutate(per=Confirmed_Total/sum(Confirmed_Total)) %>%
 
-  ggplot(aes(x="", y=Confirmed_Total, fill=fct_reorder(country, per))) + # !!to unquote
+  ggplot(aes(x="", y=Confirmed_Total, fill=fct_reorder(country, per, .desc = TRUE))) + # !!to unquote
   geom_bar(stat="identity", width=1, color="white") +
   geom_text(aes(label = paste(round(Confirmed_Total / sum(Confirmed_Total) * 100, 1), "%")),
            position = position_stack(vjust = 0.5)) +
@@ -182,6 +182,43 @@ pie_confirmed <-  confirmed %>% # "country"   "date"      "Confirmed"
   #labs(title = title,subtitle = paste0(glue(dateforplot))) +
   scale_fill_brewer(palette="Oranges")
   
+
+pie_chart2 <- function(df, group_var, title) {
+  group_var <- enquo(group_var) # to quote confirmed
+  title <- enquo(title)         # to quote
+  df %>%
+    filter(date == max(date)) %>%
+    group_by(!!group_var) %>%
+    summarise(group_var=sum(!!group_var)) %>% 
+    mutate(ranking = dense_rank(desc(!!group_var))) %>%
+    filter(ranking <= 8) %>%
+    mutate(per=!!group_var/sum(!!group_var)) %>%
+    
+    ggplot(aes(x="", y=!!group_var, fill=fct_reorder(!!group_var, per, .desc = TRUE))) + # !!to unquote
+    geom_bar(stat="identity", width=1, color="white") +
+    geom_text(aes(label = paste(round(Confirmed_Total / sum(Confirmed_Total) * 100, 1), "%")), 
+              position = position_stack(vjust = 0.5)) +
+    
+  coord_polar("y", start=0) + theme_void() +
+  #labs(title = title,subtitle = paste0(glue(dateforplot))) +
+  scale_fill_brewer(palette="Oranges")
+}
+
+
+pie_chart2(confirmed,group_var = country, title = "Top 10 Confirmed by Country")
+
+  
+  
+  
+  
+  
+
+
+
+
+
+
+
 # pie of Deaths by country
 pie_deaths <-  deaths %>% filter(date == max(date)) %>%
   mutate(ranking = dense_rank(desc(Deaths))) %>%
