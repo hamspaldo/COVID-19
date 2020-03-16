@@ -1,0 +1,250 @@
+---
+title: "COVID-19 Data Analysis"
+author: "Hamish Spalding"
+date: "16/03/2020"
+output: 
+  word_document:
+    reference_docx: HWordStyleReference.docx
+params:
+  date: !r Sys.Date()
+  author: Hamish
+
+---
+
+```{r libs, eval=TRUE, echo=FALSE}
+library(pacman)
+p_load(dplyr,readr, glue, lubridate, gridExtra, kableExtra, tidyr, ggplot2, cowplot)
+```
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=6, fig.height=4, fig.path='Figs/',
+                      echo=FALSE, include = FALSE, warning=FALSE, message=FALSE)
+```
+
+## Data Source
+
+This report was produced on `r params$date` by `r params$author`. It relies on data was pulled from the the 2019 Novel Coronavirus Visual Dashboard operated by the Johns Hopkins University Center for Systems Science and Engineering (JHU CSSE). A complete list of sources is available at https://github.com/CSSEGISandData/COVID-19 .
+
+The licence for the data is that JHU CSSE retains copyright and does not permit the use of the data for commercial purposes.
+
+Dates on charts are as at date of running the report. Data is 1 day behind this due to US time zone.
+
+```{r}
+# Raw paths to .csv on github:
+#https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv
+#https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Deaths.csv
+#https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Recovered.csv
+
+url = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv"
+destfile = "time_series_19-covid-Confirmed.csv"
+confirmed <- download.file(url, destfile)
+
+url = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Deaths.csv"
+destfile = "time_series_19-covid-Deaths.csv"
+download.file(url, destfile)
+
+url = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Recovered.csv"
+destfile = "time_series_19-covid-Recovered.csv"
+download.file(url, destfile)
+
+```
+
+
+
+```{r}
+
+## Read In and Combine Data
+
+confirmed <- read_csv("time_series_19-covid-Confirmed.csv") %>%
+  rename(country=`Country/Region`)  %>%
+  rename(state=`Province/State`)  %>%
+  mutate(country_state = paste(country, state, sep = "_")) %>%
+  select(-state,-Lat, -Long, -country_state) %>% #%>%filter(country=="Australia")
+  pivot_longer(-country, names_to = "date", values_to = "Confirmed") 
+  #filter(country=="Australia") %>% glimpse()
+  #%>%  filter(country=="US")
+
+deaths <- read_csv("time_series_19-covid-Deaths.csv") %>%
+  rename(country=`Country/Region`)  %>%
+  rename(state=`Province/State`)  %>%
+  mutate(country_state = paste(country, state, sep = "_")) %>%
+  select(-c(state, Lat, Long, country_state))%>%  #%>%filter(country=="Australia")
+  pivot_longer(-country, names_to = "date", values_to = "Deaths") %>% glimpse() 
+  #%>%  filter(country=="Australia")
+  #%>%  filter(country=="US")
+
+recovered <- read_csv("time_series_19-covid-Recovered.csv") %>%
+  rename(country=`Country/Region`)  %>%
+  rename(state=`Province/State`)  %>%
+  mutate(country_state = paste(country, state, sep = "_")) %>%
+  select(-c(state, Lat, Long, country_state))%>%
+  pivot_longer(-country, names_to = "date", values_to = "Recovered")#%>%  filter(country=="US")
+  #%>%  filter(country=="Australia")
+  #%>%  filter(country=="US")
+
+```
+
+
+## Plots
+
+```{r plots, include=TRUE}
+
+dateforplot <- params$date
+dateforplot <- as.character(dateforplot)
+#glue(dateforplot)
+#paste0(glue(dateforplot))
+
+#class(data$date) # chr - need to convert this to a date class
+#class(data$Confirmed) # numeric
+## counts for the whole world 
+plot_confirmed <- confirmed %>%# select(-country) %>%
+  #filter(country=="Australia") %>%
+  group_by(date) %>%
+  summarise(Confirmed = sum(Confirmed)) %>%
+  mutate(date = as.Date(date, format = "%m/%d/%y")) %>% # converts to a date class
+  ggplot(aes(x = date, y = Confirmed)) + geom_line() +
+      geom_col(fill = "orange") +
+      labs(title = "Total Daily Confirmed Cases",
+           #subtitle = "13 March 2020", 
+           subtitle = paste0(glue(dateforplot)),
+           x = "Date", y = "Cases") +
+  theme_light()
+  
+plot_deaths <- deaths %>%# select(-country) %>%
+  #filter(country=="Australia") %>%
+  group_by(date) %>%
+  summarise(Deaths = sum(Deaths)) %>%
+  mutate(date = as.Date(date, format = "%m/%d/%y")) %>% # converts to a date class
+  ggplot(aes(x = date, y = Deaths)) + geom_line() +
+      geom_col(fill = "orange") +
+      labs(title = "Total Daily Deaths",
+           subtitle = paste0(glue(dateforplot)),
+           x = "Date", y = "Deaths") +
+  theme_light()
+
+plot_recovered <- recovered %>%# select(-country) %>%
+  #filter(country=="Australia") %>%
+  group_by(date) %>%
+  summarise(Recovered = sum(Recovered)) %>%
+  mutate(date = as.Date(date, format = "%m/%d/%y")) %>% # converts to a date class
+  ggplot(aes(x = date, y = Recovered)) + geom_line() +
+      geom_col(fill = "orange") +
+      labs(title = "Total Daily Recoveries",
+           subtitle = paste0(glue(dateforplot)),
+           x = "Date", y = "Recoveries") +
+  theme_light()
+
+
+plot_grid(plot_confirmed, plot_deaths, plot_recovered, nrow = 3,
+            # labels = c('Confirmed', 'Deaths', 'Recovered'), 
+          label_size = 12)
+
+plot_confirmed
+plot_deaths
+plot_recovered
+
+```
+
+```{r include=TRUE}
+pie_chart <- function(df, group_var, title) {
+  group_var <- enquo(group_var) # to quote
+  title <- enquo(title)         # to quote
+  df %>%
+    select(!!group_var) %>% 
+    group_by(!!group_var) %>% 
+    summarise(Count = n()) %>%
+    mutate(per=Count/sum(Count)) %>%
+    ggplot(aes(x="", y=Count, fill=!!group_var)) + # !!to unquote
+    geom_bar(stat="identity", width=1, color="white") +
+    geom_text(aes(label = paste(round(Count / sum(Count) * 100, 1), "%")),
+              position = position_stack(vjust = 0.5)) +
+    coord_polar("y", start=0) + theme_void() +
+    #labs(title = title,subtitle = paste0(glue(dateforplot))) +
+    scale_fill_brewer(palette="Oranges")
+}
+
+
+# pie of Confirmed by country
+confirmed %>% # "country"   "date"      "Confirmed"
+  filter(date == max(date)) %>%
+  group_by(country) %>%
+  summarise(Confirmed_tot=sum(Confirmed)) %>% 
+
+   mutate(ranking = dense_rank(desc(Confirmed))) %>%
+   filter(ranking <= 10) %>%
+   select(country) %>% 
+   group_by(country) %>% 
+  
+  
+   ggplot(aes(x="", y=Count, fill=country)) + # !!to unquote
+   geom_bar(stat="identity", width=1, color="white") +
+   geom_text(aes(label = paste(round(Count / sum(Count) * 100, 1), "%")),
+             position = position_stack(vjust = 0.5)) +
+   coord_polar("y", start=0) + theme_void() +
+   #labs(title = title,subtitle = paste0(glue(dateforplot))) +
+   scale_fill_brewer(palette="Oranges")
+  
+  
+  
+  
+  pie_chart(group_var = country, title = "Top 10 Confirmed by Country")
+  
+
+# pie of Deaths by country
+pie_deaths <-  deaths %>% filter(date == max(date)) %>%
+  mutate(ranking = dense_rank(desc(Deaths))) %>%
+   filter(ranking <= 10) %>% 
+  pie_chart(group_var = country, title = "Top 10 Deaths by Country")
+
+# pie of Recovered by country
+pie_recovered <- recovered %>% filter(date == max(date)) %>%
+  mutate(ranking = dense_rank(desc(Recovered))) %>%
+   filter(ranking <= 10) %>% 
+  pie_chart(group_var = country, title = "Top 10 Recovered by Country")
+
+plot_grid(pie_confirmed, pie_deaths, pie_recovered, nrow = 1, labels = c('Confirmed', 'Deaths', 'Recovered'), 
+          label_size = 12, scale = 1)
+
+
+```
+```{r include=TRUE}
+## counts for Australia
+
+confirmed %>%# select(-country) %>%
+  filter(country=="Australia") %>%
+  group_by(date) %>%
+  summarise(Confirmed = sum(Confirmed)) %>%
+  mutate(date = as.Date(date, format = "%m/%d/%y")) %>% # converts to a date class
+  ggplot(aes(x = date, y = Confirmed)) + geom_line() +
+      geom_col(fill = "orange") +
+      labs(title = "Total Daily Confirmed Cases: Australia",
+           subtitle = paste0(glue(dateforplot)),
+           x = "Date", y = "Confirmed Cases") +
+  theme_light()
+  
+deaths %>%# select(-country) %>%
+  filter(country=="Australia") %>%
+  group_by(date) %>%
+  summarise(Deaths = sum(Deaths)) %>%
+  mutate(date = as.Date(date, format = "%m/%d/%y")) %>% # converts to a date class
+  ggplot(aes(x = date, y = Deaths)) + geom_line() +
+      geom_col(fill = "orange") +
+      labs(title = "Total Daily Deaths: Australia",
+           subtitle = paste0(glue(dateforplot)),
+           x = "Date", y = "Confirmed Deaths") +
+  theme_light()
+
+recovered %>%# select(-country) %>%
+  filter(country=="Australia") %>%
+  group_by(date) %>%
+  summarise(Recovered = sum(Recovered)) %>%
+  mutate(date = as.Date(date, format = "%m/%d/%y")) %>% # converts to a date class
+  ggplot(aes(x = date, y = Recovered)) + geom_line() +
+      geom_col(fill = "orange") +
+      labs(title = "Total Daily Recoveries: Australia",
+           subtitle = paste0(glue(dateforplot)),
+           x = "Date", y = "Confirmed Recoveries") +
+  theme_light()
+      
+```
+
