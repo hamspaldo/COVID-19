@@ -163,33 +163,25 @@ pie_chart <- function(df, group_var, title) {
     scale_fill_brewer(palette="Oranges")
 }
 
+pie_chart(x,group_var = country, title = "Top 10 Confirmed by Country")
 
 # pie of Confirmed by country
-confirmed %>% # "country"   "date"      "Confirmed"
+pie_confirmed <-  confirmed %>% # "country"   "date"      "Confirmed"
   filter(date == max(date)) %>%
   group_by(country) %>%
-  summarise(Confirmed_tot=sum(Confirmed)) %>% 
+  summarise(Confirmed_Total=sum(Confirmed)) %>% 
+  mutate(ranking = dense_rank(desc(Confirmed_Total))) %>%
+  filter(ranking <= 8) %>%
+  mutate(per=Confirmed_Total/sum(Confirmed_Total)) %>%
 
-   mutate(ranking = dense_rank(desc(Confirmed))) %>%
-   filter(ranking <= 10) %>%
-   select(country) %>% 
-   group_by(country) %>% 
+  ggplot(aes(x="", y=Confirmed_Total, fill=fct_reorder(country, per))) + # !!to unquote
+  geom_bar(stat="identity", width=1, color="white") +
+  geom_text(aes(label = paste(round(Confirmed_Total / sum(Confirmed_Total) * 100, 1), "%")),
+           position = position_stack(vjust = 0.5)) +
+  coord_polar("y", start=0) + theme_void() +
+  #labs(title = title,subtitle = paste0(glue(dateforplot))) +
+  scale_fill_brewer(palette="Oranges")
   
-  
-   ggplot(aes(x="", y=Count, fill=country)) + # !!to unquote
-   geom_bar(stat="identity", width=1, color="white") +
-   geom_text(aes(label = paste(round(Count / sum(Count) * 100, 1), "%")),
-             position = position_stack(vjust = 0.5)) +
-   coord_polar("y", start=0) + theme_void() +
-   #labs(title = title,subtitle = paste0(glue(dateforplot))) +
-   scale_fill_brewer(palette="Oranges")
-  
-  
-  
-  
-  pie_chart(group_var = country, title = "Top 10 Confirmed by Country")
-  
-
 # pie of Deaths by country
 pie_deaths <-  deaths %>% filter(date == max(date)) %>%
   mutate(ranking = dense_rank(desc(Deaths))) %>%
@@ -202,8 +194,8 @@ pie_recovered <- recovered %>% filter(date == max(date)) %>%
    filter(ranking <= 10) %>% 
   pie_chart(group_var = country, title = "Top 10 Recovered by Country")
 
-plot_grid(pie_confirmed, pie_deaths, pie_recovered, nrow = 1, labels = c('Confirmed', 'Deaths', 'Recovered'), 
-          label_size = 12, scale = 1)
+plot_grid(pie_confirmed, pie_deaths, pie_recovered, nrow = 3, labels = c('Confirmed', 'Deaths', 'Recovered'), 
+          label_size = 12, scale = 1.5)
 
 
 ```
