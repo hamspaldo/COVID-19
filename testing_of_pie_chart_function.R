@@ -37,11 +37,12 @@ pie_chart2 <- function(df, group_var, title="") {
 }
 
 
-pie_chart2(df=confirmed, group_var=country, title="")
+pie_chart2(df=confirmed, group_var=country, title="") # works
 
-pie_chart2(df=recovered, group_var=country, title="")
 
-pie_chart2(df=confirmed, group_var=country, title="")
+pie_chart2(df=recovered, group_var=country, title="") # up to here doesn't work
+
+pie_chart2(df=confirmed, group_var=country, title="") # up to here doesn't work
 
 
 
