@@ -59,17 +59,26 @@ confirmed <- read_csv("time_series_19-covid-Confirmed.csv") %>%
   rename(country=`Country/Region`)  %>%
   rename(state=`Province/State`)  %>%
   mutate(country_state = paste(country, state, sep = "_")) %>%
-  select(-state,-Lat, -Long, -country_state) %>% #%>%filter(country=="Australia")
-  pivot_longer(-country, names_to = "date", values_to = "Confirmed") 
+  select(-c(state, Lat, Long, country_state))%>%  #%>%filter(country=="Australia")
+  pivot_longer(-country, names_to = "date", values_to = "total") %>%
+  mutate(group="Confirmed")
+  #group_by(country) %>%
+  #summarise(confirmed)
   #filter(country=="Australia") %>% glimpse()
   #%>%  filter(country=="US")
+
+#Checks
+write.csv(confirmed, file = "check_confirmed.csv") # there is no double counting of Country.
+glimpse(confirmed) # why is this the max dagte: "3/9/20"
+max(confirmed$date)
 
 deaths <- read_csv("time_series_19-covid-Deaths.csv") %>%
   rename(country=`Country/Region`)  %>%
   rename(state=`Province/State`)  %>%
   mutate(country_state = paste(country, state, sep = "_")) %>%
   select(-c(state, Lat, Long, country_state))%>%  #%>%filter(country=="Australia")
-  pivot_longer(-country, names_to = "date", values_to = "Deaths") %>% glimpse() 
+  pivot_longer(-country, names_to = "date", values_to = "total") %>%
+  mutate(group="Deaths") 
   #%>%  filter(country=="Australia")
   #%>%  filter(country=="US")
 
@@ -78,7 +87,8 @@ recovered <- read_csv("time_series_19-covid-Recovered.csv") %>%
   rename(state=`Province/State`)  %>%
   mutate(country_state = paste(country, state, sep = "_")) %>%
   select(-c(state, Lat, Long, country_state))%>%
-  pivot_longer(-country, names_to = "date", values_to = "Recovered")#%>%  filter(country=="US")
+  pivot_longer(-country, names_to = "date", values_to = "total") %>% #%>%  filter(country=="US")
+  mutate(group="Recovered")
   #%>%  filter(country=="Australia")
   #%>%  filter(country=="US")
 
@@ -98,19 +108,21 @@ dateforplot <- as.character(dateforplot)
 #class(data$Confirmed) # numeric
 ## counts for the whole world 
 plot_confirmed <- confirmed %>%# select(-country) %>%
+  select(-group)%>%
   #filter(country=="Australia") %>%
   group_by(date) %>%
   summarise(Confirmed = sum(Confirmed)) %>%
   mutate(date = as.Date(date, format = "%m/%d/%y")) %>% # converts to a date class
-  ggplot(aes(x = date, y = Confirmed)) + geom_line() +
+  ggplot(aes(x = date, y = Confirmed)) + geom_line() + geom_point() +
       geom_col(fill = "orange") +
       labs(title = "Total Daily Confirmed Cases",
            #subtitle = "13 March 2020", 
            subtitle = paste0(glue(dateforplot)),
            x = "Date", y = "Cases") +
-  theme_light()
+  theme_minimal_vgrid()
   
 plot_deaths <- deaths %>%# select(-country) %>%
+  select(-group)%>%
   #filter(country=="Australia") %>%
   group_by(date) %>%
   summarise(Deaths = sum(Deaths)) %>%
@@ -120,10 +132,11 @@ plot_deaths <- deaths %>%# select(-country) %>%
       labs(title = "Total Daily Deaths",
            subtitle = paste0(glue(dateforplot)),
            x = "Date", y = "Deaths") +
-  theme_light()
+  theme_light() + theme_linedraw()
 
 plot_recovered <- recovered %>%# select(-country) %>%
   #filter(country=="Australia") %>%
+  select(-group)%>%
   group_by(date) %>%
   summarise(Recovered = sum(Recovered)) %>%
   mutate(date = as.Date(date, format = "%m/%d/%y")) %>% # converts to a date class
@@ -142,6 +155,22 @@ plot_grid(plot_confirmed, plot_deaths, plot_recovered, nrow = 3,
 plot_confirmed
 plot_deaths
 plot_recovered
+
+
+rbind(recovered, confirmed, deaths)
+plot_all <- rbind(recovered, confirmed, deaths) %>%# select(-country) %>%
+  #filter(country=="Australia") %>%
+  
+  group_by(date) %>%
+  summarise(Recovered = sum(Recovered)) %>%
+  mutate(date = as.Date(date, format = "%m/%d/%y")) %>% # converts to a date class
+  ggplot(aes(x = date, y = Recovered)) + geom_line() +
+      geom_col(fill = "orange") +
+      labs(title = "Total Daily Recoveries",
+           subtitle = paste0(glue(dateforplot)),
+           x = "Date", y = "Recoveries") +
+  theme_light()
+
 
 ```
 
