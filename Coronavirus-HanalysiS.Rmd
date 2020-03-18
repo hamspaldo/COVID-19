@@ -52,46 +52,51 @@ download.file(url, destfile)
 
 
 ```{r}
+checks <- read_csv("time_series_19-covid-Confirmed.csv") %>%
+  rename(country=`Country/Region`)  %>%
+  rename(state=`Province/State`)  %>%
+  mutate(country_state = paste(country, state, sep = "_")) %>%
+  select(-c(state, Lat, Long))%>%  
+  filter(country=="Australia") 
+#dim(checks)
+#names(checks) # to get date
 
+checks.australia <- select(checks,country_state,"3/17/20")
+```
+
+
+```{r}
 ## Read In and Combine Data
 
-confirmed <- read_csv("time_series_19-covid-Confirmed.csv") %>%
+get.data <- function(csvfile="time_series_19-covid-Confirmed.csv",
+         group_label="Confirmed"){
+  df <- read_csv(csvfile) %>%
   rename(country=`Country/Region`)  %>%
   rename(state=`Province/State`)  %>%
   mutate(country_state = paste(country, state, sep = "_")) %>%
+  #select(-c(state, Lat, Long))%>%  
   select(-c(state, Lat, Long, country_state))%>%  #%>%filter(country=="Australia")
-  pivot_longer(-country, names_to = "date", values_to = "total") %>%
-  mutate(group="Confirmed")
-  #group_by(country) %>%
-  #summarise(confirmed)
-  #filter(country=="Australia") %>% glimpse()
-  #%>%  filter(country=="US")
+  pivot_longer(-country, names_to = "date", values_to = "n") %>%
+  mutate(date = as.Date(date, format = "%m/%d/%y")) %>% 
+  mutate(group=group_label)
+  df
+}
 
-#Checks
-write.csv(confirmed, file = "check_confirmed.csv") # there is no double counting of Country.
-glimpse(confirmed) # why is this the max dagte: "3/9/20"
-max(confirmed$date)
+get.data("time_series_19-covid-Confirmed.csv",group_label="Confirmed")
+get.data("time_series_19-covid-Deaths.csv",group_label="Deaths")
+get.data("time_series_19-covid-Recovered.csv",group_label="Recovered")
 
-deaths <- read_csv("time_series_19-covid-Deaths.csv") %>%
-  rename(country=`Country/Region`)  %>%
-  rename(state=`Province/State`)  %>%
-  mutate(country_state = paste(country, state, sep = "_")) %>%
-  select(-c(state, Lat, Long, country_state))%>%  #%>%filter(country=="Australia")
-  pivot_longer(-country, names_to = "date", values_to = "total") %>%
-  mutate(group="Deaths") 
-  #%>%  filter(country=="Australia")
-  #%>%  filter(country=="US")
+#confirmed <- read_csv("time_series_19-covid-Confirmed.csv") %>%
+#  rename(country=`Country/Region`)  %>%
+#  rename(state=`Province/State`)  %>%
+#  mutate(country_state = paste(country, state, sep = "_")) %>%
+#  #select(-c(state, Lat, Long))%>%  
+#  select(-c(state, Lat, Long, country_state))%>%  #%>%filter(country=="Australia")
+#  pivot_longer(-country, names_to = "date", values_to = "n") %>%
+#  mutate(date = as.Date(date, format = "%m/%d/%y")) %>% 
+#  mutate(group="Confirmed")#
 
-recovered <- read_csv("time_series_19-covid-Recovered.csv") %>%
-  rename(country=`Country/Region`)  %>%
-  rename(state=`Province/State`)  %>%
-  mutate(country_state = paste(country, state, sep = "_")) %>%
-  select(-c(state, Lat, Long, country_state))%>%
-  pivot_longer(-country, names_to = "date", values_to = "total") %>% #%>%  filter(country=="US")
-  mutate(group="Recovered")
-  #%>%  filter(country=="Australia")
-  #%>%  filter(country=="US")
-
+all <- rbind(confirmed, deaths, recovered)
 ```
 
 
