@@ -13,7 +13,8 @@ params:
 
 ```{r libs, eval=TRUE, echo=FALSE}
 library(pacman)
-p_load(dplyr,readr, glue, lubridate, gridExtra, kableExtra, tidyr, ggplot2, cowplot, forcats)
+p_load(dplyr,readr, glue, lubridate, gridExtra, kableExtra, tidyr, ggplot2, cowplot, forcats,stringr)
+p_load(gganimate)
 ```
 
 ```{r global_options, include=FALSE}
@@ -51,7 +52,7 @@ download.file(url, destfile)
 
 
 
-```{r}
+```{r, warning=FALSE}
 checks <- read_csv("time_series_19-covid-Confirmed.csv") %>%
   rename(country=`Country/Region`)  %>%
   rename(state=`Province/State`)  %>%
@@ -60,8 +61,15 @@ checks <- read_csv("time_series_19-covid-Confirmed.csv") %>%
   filter(country=="Australia") 
 #dim(checks)
 #names(checks) # to get date
+#but last column is checks[,ncol(checks)-1]
+#Sys.Date() # "2020-03-25"
 
-checks.australia <- select(checks,country_state,"3/17/20")
+
+checks.australia.state <- select(checks,country_state,names(checks[,ncol(checks)-1]))
+checks.australia.total <- select(checks,country_state,names(checks[,ncol(checks)-1])) %>% select(names(checks[,ncol(checks)-1])) %>% sum()
+checks.australia.state
+checks.australia.total
+
 ```
 
 
@@ -69,22 +77,42 @@ checks.australia <- select(checks,country_state,"3/17/20")
 ## Read In and Combine Data
 
 get.data <- function(csvfile="time_series_19-covid-Confirmed.csv",
-         group_label="Confirmed"){
+         group_label="Confirmed"){                            
   df <- read_csv(csvfile) %>%
   rename(country=`Country/Region`)  %>%
   rename(state=`Province/State`)  %>%
   mutate(country_state = paste(country, state, sep = "_")) %>%
-  #select(-c(state, Lat, Long))%>%  
   select(-c(state, Lat, Long, country_state))%>%  #%>%filter(country=="Australia")
   pivot_longer(-country, names_to = "date", values_to = "n") %>%
   mutate(date = as.Date(date, format = "%m/%d/%y")) %>% 
-  mutate(group=group_label)
+  mutate(group=group_label) %>%
+  group_by(country,date, group) %>% summarize(n = sum(n))
   df
 }
 
-get.data("time_series_19-covid-Confirmed.csv",group_label="Confirmed")
-get.data("time_series_19-covid-Deaths.csv",group_label="Deaths")
-get.data("time_series_19-covid-Recovered.csv",group_label="Recovered")
+get.data.state <- function(csvfile="time_series_19-covid-Confirmed.csv",
+         group_label="Confirmed"){
+  df <- read_csv(csvfile) %>%
+    rename(country=`Country/Region`)  %>%
+    rename(state=`Province/State`)  %>%
+    mutate(country_state = paste(country, state, sep = "_")) %>%
+    select(-c(state, Lat, Long, country))%>%
+  #select(-c(state, Lat, Long, country_state))%>%  #%>%filter(country=="Australia")
+    pivot_longer(-country_state, names_to = "date", values_to = "n") %>%
+    mutate(date = as.Date(date, format = "%m/%d/%y")) %>%
+    mutate(group=group_label) %>%
+    group_by(country_state,date, group) %>% summarize(n = sum(n))
+  df
+}
+
+confirmed <- get.data("time_series_19-covid-Confirmed.csv",group_label="Confirmed")
+deaths <- get.data("time_series_19-covid-Deaths.csv",group_label="Deaths")
+recovered <- get.data("time_series_19-covid-Recovered.csv",group_label="Recovered")
+
+confirmed.state <- get.data.state("time_series_19-covid-Confirmed.csv",group_label="Confirmed")
+deaths.state <- get.data.state("time_series_19-covid-Deaths.csv",group_label="Deaths")
+recovered.state <- get.data.state("time_series_19-covid-Recovered.csv",group_label="Recovered")
+
 
 #confirmed <- read_csv("time_series_19-covid-Confirmed.csv") %>%
 #  rename(country=`Country/Region`)  %>%
@@ -97,12 +125,107 @@ get.data("time_series_19-covid-Recovered.csv",group_label="Recovered")
 #  mutate(group="Confirmed")#
 
 all <- rbind(confirmed, deaths, recovered)
-```
+all.state <- rbind(confirmed.state,deaths.state, recovered.state)
 
+aus <- filter(all, country=="Australia")
+
+all.state <- rbind(confirmed.state,deaths.state,recovered.state) 
+
+aus.state <- filter(all.state, str_detect(country_state, "Australia"))
+
+```
 
 ## Plots
 
-```{r plots, include=TRUE}
+
+## Australia vs other Countries that Contained Well
+
+```{r include=TRUE, warning=FALSE}
+all %>% 
+  filter(date >= "2020-03-01" & date <= Sys.Date()) %>%
+  #filter(group == "Confirmed") %>% # choose: "Confirmed" "Deaths"    "Recovered"
+  filter(country %in% c("Australia","Singapore")) %>%
+           #, "Iran", "Italy", "US", "Singapore")) %>% # choose country
+  ggplot(aes(x = date, y = n)) +
+  geom_line(aes(color = country, linetype = country)) +
+  theme_light() +
+  scale_y_log10() +
+  facet_grid(group~.)
+```
+
+## Several Countries in Same chart
+
+```{r include=TRUE, warning=FALSE}
+all %>% 
+  filter(date >= "2020-02-20" & date <= Sys.Date()) %>%
+  #filter(date >= as.Date("2020-03-07") & date <= as.Date("2020-03-19")) %>%
+  filter(group == "Confirmed") %>% # choose: "Confirmed" "Deaths"    "Recovered"
+  filter(country %in% c("Australia", "Singapore", "United Kingdom", "US")) %>% # choose country
+  ggplot(aes(x = date, y = n)) +
+  geom_line(aes(color = country, linetype = country)) + 
+  scale_color_manual(values = c("black", "steelblue", "red", "blue")) +
+  theme_minimal_vgrid() +
+  scale_y_log10()
+
+```
+
+## Several states in Same chart
+
+```{r include=TRUE, warning=FALSE}
+aus.state %>% 
+  filter(date >= "2020-02-20" & date <= Sys.Date()) %>%
+  filter(group == "Confirmed") %>% # choose: "Confirmed" "Deaths"    "Recovered"
+  ggplot(aes(x = date, y = n)) +
+  geom_line(aes(color = country_state, linetype = country_state)) +
+  theme_minimal_vgrid() +
+  scale_y_log10()
+  #scale_color_manual(values = c("black", "steelblue", "red", "blue"))
+  
+```
+
+
+```{r include=TRUE, warning=FALSE}
+dateforplot <- params$date
+dateforplot <- as.character(dateforplot)
+aus.state %>% 
+  filter(date >= "2020-03-01" & date <= Sys.Date()) %>%
+  filter(group == "Confirmed") %>% # choose: "Confirmed" "Deaths"    "Recovered"
+  ggplot(aes(x = date, y = n)) +
+  geom_line(aes(color = country_state, linetype = country_state)) + 
+  facet_grid(group~.) +
+  labs(title = "Total Daily Confirmed Cases",
+           subtitle = paste0(glue(dateforplot)),
+           x = "Date", y = "Cases") +
+  theme_minimal_vgrid()
+
+aus.state.fit <- aus.state %>% 
+  filter(date >= "2020-03-01" & date <= Sys.Date()) %>%
+  filter(country_state=="Australia_New South Wales") %>% #
+  filter(group == "Confirmed") # choose: "Confirmed" "Deaths"    "Recovered"
+
+exponential.model <- lm(log(aus.state.fit$n)~ aus.state$date)
+summary(exponential.model)
+
+y <- aus.state.fit$country_state
+x <- aus.state.fit$date
+Estimate = lm(y ~ x)
+logEstimate = lm(y ~ log(x))
+
+plot(x,predict(Estimate),type='l',col='blue')
+lines(x,predict(logEstimate),col='red')
+points(x,y)
+
+
+
+  ggplot(aes(x = date, y = n)) +
+  geom_line(aes(color = country_state, linetype = country_state))
+
+```
+
+
+## Bin
+
+```{r plots, eval=FALSE, include=FALSE}
 
 dateforplot <- params$date
 dateforplot <- as.character(dateforplot)
@@ -113,15 +236,14 @@ dateforplot <- as.character(dateforplot)
 #class(data$Confirmed) # numeric
 ## counts for the whole world 
 plot_confirmed <- confirmed %>%# select(-country) %>%
-  select(-group)%>%
   #filter(country=="Australia") %>%
-  group_by(date) %>%
-  summarise(Confirmed = sum(Confirmed)) %>%
-  mutate(date = as.Date(date, format = "%m/%d/%y")) %>% # converts to a date class
+  #mutate(date = as.Date(date, format = "%m/%d/%y")) %>% # converts to a date class
+  group_by(date,country) %>%
+  summarise(Confirmed = sum(n)) %>%
   ggplot(aes(x = date, y = Confirmed)) + geom_line() + geom_point() +
       geom_col(fill = "orange") +
       labs(title = "Total Daily Confirmed Cases",
-           #subtitle = "13 March 2020", 
+           #subtitle = "19 March 2020", 
            subtitle = paste0(glue(dateforplot)),
            x = "Date", y = "Cases") +
   theme_minimal_vgrid()
@@ -133,7 +255,7 @@ plot_deaths <- deaths %>%# select(-country) %>%
   summarise(Deaths = sum(Deaths)) %>%
   mutate(date = as.Date(date, format = "%m/%d/%y")) %>% # converts to a date class
   ggplot(aes(x = date, y = Deaths)) + geom_line() +
-      geom_col(fill = "orange") +
+      #geom_col(fill = "orange") +
       labs(title = "Total Daily Deaths",
            subtitle = paste0(glue(dateforplot)),
            x = "Date", y = "Deaths") +
@@ -179,7 +301,7 @@ plot_all <- rbind(recovered, confirmed, deaths) %>%# select(-country) %>%
 
 ```
 
-```{r include=TRUE}
+```{r eval=FALSE, include=FALSE}
 pie_chart <- function(df, group_var, title) {
   group_var <- enquo(group_var) # to quote
   title <- enquo(title)         # to quote
@@ -270,7 +392,7 @@ plot_grid(pie_confirmed, pie_deaths, pie_recovered, nrow = 3, labels = c('Confir
 
 
 ```
-```{r include=TRUE}
+```{r eval=FALSE, include=FALSE}
 ## counts for Australia
 
 confirmed %>%# select(-country) %>%
@@ -311,3 +433,32 @@ recovered %>%# select(-country) %>%
       
 ```
 
+## Appendix
+
+```{r plotstesting1, eval=FALSE, include=FALSE}
+
+all %>% 
+  filter(group == "Confirmed") %>% # choose: "Confirmed" "Deaths"    "Recovered"
+  filter(country==c("Australia", "Iran", "Italy", "US")) %>% # choose country
+  group_by(country,date, group) %>% summarize(n = sum(n)) %>%
+  ggplot(aes(x = date, y = n)) +
+  geom_line(aes(color = country, linetype = country)) + 
+  scale_color_manual(values = c("darkred", "steelblue", "red", "blue"))
+# Try away from desktop due to wirte positions..
+#
+#p_load(gganimate)
+#p <-all %>% 
+  #filter(group == "Confirmed") %>% # choose: "Confirmed" "Deaths"    "Recovered"
+  #filter(country==c("Australia", "Iran", "Italy", "US")) %>% # choose country
+  #group_by(country,date, group) %>% summarize(n = sum(n)) %>%
+  #ggplot(aes(x = date, y = n)) +
+  #geom_point(aes(color = country)) + 
+  #scale_color_manual(values = c("darkred", "steelblue", "red", "blue"))
+
+#anim <- p + 
+  #transition_states(country,
+                    #transition_length = 2,
+                    #state_length = 1)
+#anim
+#
+```
