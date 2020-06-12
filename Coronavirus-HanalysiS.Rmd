@@ -184,7 +184,7 @@ aus.state %>%
 ```
 
 
-```{r include=TRUE, warning=FALSE}
+```{r eval=FALSE, warning=FALSE, include=FALSE}
 dateforplot <- params$date
 dateforplot <- as.character(dateforplot)
 aus.state %>% 
